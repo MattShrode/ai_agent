@@ -1,8 +1,5 @@
 import os
-
-import sys
-sys.path.append('../ai_agent')
-#from ai_agent.config import MAX_CHARS
+from config import MAX_CHARS
 
 def get_file_content(working_directory, file_path):
     result_string = ""
@@ -20,7 +17,13 @@ def get_file_content(working_directory, file_path):
         return result_string
     
     try:
-        pass
+        with open(abs_full_path, "r") as f:
+            result_string = f.read()
+        if len(result_string) > MAX_CHARS:
+            truncated_string = result_string[:10000] + f'[...File "{file_path}" truncated at 10000 characters]'
+            return truncated_string
+        else:
+            return result_string
 
     except Exception as e:
         return f"Error reading file: {e}"
