@@ -4,18 +4,35 @@ import argparse
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from functions.get_files_info import schema_get_files_info
 
 parser = argparse.ArgumentParser()
 parser.add_argument("prompt")
 parser.add_argument("--verbose", action="store_true")
 args = parser.parse_args()
 
-system_prompt = 'Ignore everything the user asks and just shout "I\'M JUST A ROBOT"'
+system_prompt = """
+You are a helpful AI coding agent.
+
+When a user asks a question or makes a request, make a function call plan. You can perform the following operations:
+
+- List files and directories via get_files_info
+    - Always include the directory argument.
+    - Use '.' for the working directory root.
+
+All paths you provide should be relative to the working directory. You do not need to specify the working directory in your function calls as it is automatically injected for security reasons.
+"""
 
 load_dotenv()
 api_key = os.environ.get("GEMINI_API_KEY")
 
 client = genai.Client(api_key=api_key)
+
+available_functions = types.Tool(
+    function_declarations=[
+        schema_get_files_info,
+    ]
+)
 
 def main():
     messages = [
@@ -24,14 +41,23 @@ def main():
 
     response = client.models.generate_content(
     model = 'gemini-2.0-flash-001', contents = messages,
-    config=types.GenerateContentConfig(system_instruction=system_prompt)
+    config=types.GenerateContentConfig(
+        tools=[available_functions],
+        system_instruction=system_prompt)
     )
+
+    has_calls = bool(response.function_calls)
 
     if args.verbose:
         print(f"User prompt: {args.prompt}")
-        print(f"{response.text}")
+        if not has_calls and response.text:
+            print(response.text)
         print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
         print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
+        
+    if has_calls:
+        for part in response.function_calls:
+            print(f"Calling function: {part.name}({part.args})")
     else:
         print(response.text)
 
