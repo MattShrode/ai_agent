@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from functions.get_files_info import schema_get_files_info
+from functions.get_file_content import schema_get_file_content
 
 parser = argparse.ArgumentParser()
 parser.add_argument("prompt")
@@ -19,6 +20,7 @@ When a user asks a question or makes a request, make a function call plan. You c
 - List files and directories via get_files_info
     - Always include the directory argument.
     - Use '.' for the working directory root.
+- Read file contents via get_file_content
 
 All paths you provide should be relative to the working directory. You do not need to specify the working directory in your function calls as it is automatically injected for security reasons.
 """
@@ -31,6 +33,7 @@ client = genai.Client(api_key=api_key)
 available_functions = types.Tool(
     function_declarations=[
         schema_get_files_info,
+        schema_get_file_content
     ]
 )
 
