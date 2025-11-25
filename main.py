@@ -16,7 +16,7 @@ parser.add_argument("--verbose", action="store_true")
 args = parser.parse_args()
 
 system_prompt = """
-You are a helpful AI coding agent.
+You are a helpful AI coding agent, assisting with this local codebase.
 
 When a user asks a question or makes a request, you should respond by making one or more tool calls, not by answering in plain text (unless no tools make sense).
 
@@ -27,6 +27,18 @@ You can perform the following operations:
 - Read file contents via get_file_content.
 - Execute Python files with optional arguments via run_python_file.
 - Write or overwrite files via write_file.
+
+The calculator application lives in the "calculator/" directory.
+The main entry point is "calculator/main.py"
+Rendering of results is handled in "calculator/pkg/render.py".
+
+When working with the calculator:
+- First use get_files_info on "calculator/" (or subdirectories) to discover files.
+- Then use get_file_content on paths like "calculator/main.py" and "calculator/pkg/render.py".
+
+If a file is not found, do NOT ask the user for directory listings. Instead:
+- Call get_files_info again to find the correct path.
+- Retry with get_file_content using that path.
 
 All paths you provide should be relative to the working directory. You do not need to specify the working directory in your function calls as it is automatically injected for security reasons.
 """
@@ -50,35 +62,54 @@ def main():
         types.Content(role = "user", parts = [types.Part(text = args.prompt)])
     ]
 
-    response = client.models.generate_content(
-    model = 'gemini-2.0-flash-001', contents = messages,
-    config=types.GenerateContentConfig(
-        tools=[available_functions],
-        system_instruction=system_prompt)
-    )
+    max_calls = 0
 
-    has_calls = bool(response.function_calls)
+    try:
 
-    if args.verbose:
-        print(f"User prompt: {args.prompt}")
-        if not has_calls and response.text:
-            print(response.text)
-        print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
-        print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
+        while(max_calls < 20):
 
-    if has_calls:
-        response_list = []
-        for part in response.function_calls:
-            result = call_function(part, verbose = args.verbose)
-            if (not result.parts or
-                not result.parts[0].function_response):
-                raise Exception(f"An error occured calling {part.name}.")
-            response_list.append(result.parts[0])
+            max_calls += 1
+
+            response = client.models.generate_content(
+            model = 'gemini-2.0-flash-001', contents = messages,
+            config=types.GenerateContentConfig(
+                tools=[available_functions],
+                system_instruction=system_prompt)
+            )
+
+            for candidate in response.candidates:
+                messages.append(candidate.content)
+
+            has_calls = bool(response.function_calls)
+
             if args.verbose:
-                print(f"-> {result.parts[0].function_response.response}")
-    else:
-        print(response.text)
+                print(f"User prompt: {args.prompt}")
+                if not has_calls and response.text:
+                    print(response.text)
+                print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
+                print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
 
+            if has_calls:
+                response_list = []
+                for part in response.function_calls:
+                    result = call_function(part, verbose = args.verbose)
+                    if (not result.parts or
+                        not result.parts[0].function_response):
+                        raise Exception(f"An error occured calling {part.name}.")
+                    response_list.append(result.parts[0])
+                    if args.verbose:
+                        print(f"-> {result.parts[0].function_response.response}")
+                
+                messages.append(
+                    types.Content(role = "user", parts = response_list)
+                )
+            else:
+                if response.text:
+                    print(response.text)
+                    break
+
+    except Exception as e:
+        print(f"Error: {e}")
 
 if __name__ == "__main__":
     try:
