@@ -37,6 +37,9 @@ def main():
 
     max_calls = 0
 
+    if args.verbose:
+        print(f"User prompt: {args.prompt}")
+
     try:
 
         while(max_calls < 20):
@@ -56,7 +59,6 @@ def main():
             has_calls = bool(response.function_calls)
 
             if args.verbose:
-                print(f"User prompt: {args.prompt}")
                 if not has_calls and response.text:
                     print(response.text)
                 print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
