@@ -59,8 +59,8 @@ def main():
             has_calls = bool(response.function_calls)
 
             if args.verbose:
-                if not has_calls and response.text:
-                    print(response.text)
+                #if not has_calls and response.text:
+                    #print(response.text)
                 print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
                 print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
 
